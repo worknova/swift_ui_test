@@ -25,20 +25,24 @@ jobs:
       - name: Select and boot iOS Simulator
         shell: bash
         run: |
-          python3 - <<'PY'
-          import json,os,subprocess
+          SIMULATOR_UDID="$(python3 - <<'PY'
+          import json,subprocess
           data=json.loads(subprocess.check_output(["xcrun","simctl","list","devices","available","-j"]))
           choices=[]
           for runtime,devices in data["devices"].items():
-              if "iOS" not in runtime:continue
+              if "iOS" not in runtime: continue
               for item in devices:
-                  if item.get("isAvailable",True) and item["name"].startswith("iPhone"):
+                  if item.get("isAvailable", True) and item["name"].startswith("iPhone"):
                       choices.append((item["name"]!="iPhone 17",item["name"],item["udid"]))
-          if not choices:raise SystemExit("No iOS Simulator")
+          if not choices: raise SystemExit("No iOS Simulator")
           choices.sort()
-          with open(os.environ["GITHUB_ENV"],"a") as out:
-              out.write("SIMULATOR_UDID="+choices[0][2]+"\n")
+          print(choices[0][2])
           PY
+          )"
+          test -n "$SIMULATOR_UDID"
+          echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
+          echo "Booting simulator: $SIMULATOR_UDID"
+          xcrun simctl list devices available | grep -F "$SIMULATOR_UDID"
           xcrun simctl boot "$SIMULATOR_UDID" || true
           xcrun simctl bootstatus "$SIMULATOR_UDID" -b
           xcrun simctl ui "$SIMULATOR_UDID" appearance dark

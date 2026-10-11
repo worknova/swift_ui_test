@@ -1,6 +1,11 @@
 name: TDI Glass Capture
 on:
   workflow_dispatch:
+    inputs:
+      make_review_60fps:
+        description: 'Also encode review video at 60 FPS (original VFR always retained)'
+        type: boolean
+        default: false
   push:
     branches: [tdi-system-morph-membrane-20261012]
     paths:
@@ -10,14 +15,18 @@ permissions:
 jobs:
   capture:
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 25
+    env:
+      TDI_MAKE_REVIEW_60FPS: ${{ inputs.make_review_60fps || 'false' }}
     steps:
       - uses: actions/checkout@v4
       - name: Prepare build and video tools
         shell: bash
         run: |
-          brew list --versions xcodegen >/dev/null 2>&1 || brew install xcodegen
-          brew list --versions ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+          mkdir -p tdi-output
+          echo "setup_start=$(date +%s)" >> "$GITHUB_ENV"
+          command -v xcodegen >/dev/null || brew install xcodegen
+          command -v ffmpeg >/dev/null || brew install ffmpeg
           command -v xcodegen
           command -v ffmpeg
           command -v ffprobe
@@ -43,16 +52,31 @@ jobs:
           echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
           echo "Booting simulator: $SIMULATOR_UDID"
           xcrun simctl list devices available | grep -F "$SIMULATOR_UDID"
+          echo "simulator_start=$(date +%s)" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIMULATOR_UDID" || true
-          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
-          xcrun simctl ui "$SIMULATOR_UDID" appearance dark
+          # Do not wait here: Xcode can build while the simulator initializes.
       - name: Build native app and XCTest
         shell: bash
         run: |
-          mkdir -p tdi-output
-          xcodebuild build-for-testing -project TDILab.xcodeproj -scheme TDILab -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" -derivedDataPath DerivedData -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO > tdi-output/build.log 2>&1 || { tail -n 120 tdi-output/build.log; exit 1; }
-      - name: Record four real native press interactions
-        run: python3 scripts/record_tdi.py
+          build_start=$(date +%s)
+          xcodebuild build-for-testing -project TDILab.xcodeproj -scheme TDILab -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO > tdi-output/build.log 2>&1 || { tail -n 120 tdi-output/build.log; exit 1; }
+          echo "build_seconds=$(( $(date +%s) - build_start ))" >> tdi-output/stage-timings.txt
+      - name: Wait for simulator and record four native holds
+        shell: bash
+        run: |
+          set -euo pipefail
+          boot_wait_start=$(date +%s)
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+          xcrun simctl ui "$SIMULATOR_UDID" appearance dark
+          echo "post_build_boot_wait_seconds=$(( $(date +%s) - boot_wait_start ))" >> tdi-output/stage-timings.txt
+          capture_start=$(date +%s)
+          python3 scripts/record_tdi.py
+          echo "capture_seconds=$(( $(date +%s) - capture_start ))" >> tdi-output/stage-timings.txt
+      - name: Print timing summary
+        if: always()
+        shell: bash
+        run: |
+          if test -f tdi-output/stage-timings.txt; then cat tdi-output/stage-timings.txt; fi
       - name: Upload native recording and audit logs
         if: always()
         uses: actions/upload-artifact@v4

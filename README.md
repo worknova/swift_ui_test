@@ -1,6 +1,6 @@
 # TDI · Native Liquid Glass Press Lab
 
-Three targeted native SwiftUI hypotheses for a compelling physical press response. This is an optical research experiment, **not** a claim to reproduce any third-party implementation.
+Four targeted native SwiftUI hypotheses for a compelling physical press response. This is an optical research experiment, **not** a claim to reproduce any third-party implementation.
 
 ## Hypotheses
 
@@ -9,6 +9,7 @@ Three targeted native SwiftUI hypotheses for a compelling physical press respons
 | **SYSTEM** | One button with `.regular.interactive()`, no authored press animation | Native touch response alone creates a legible, organic lens-like reaction | Only a generic scale/bounce with insufficient rim depth is visible |
 | **MORPH** | `GlassEffectContainer`, `glassEffectID`, `.glassEffectTransition(.matchedGeometry)`; two peripheral glass surfaces appear while pressing | Glass surfaces visually coalesce near the **fixed 274×80 pt** core, emphasizing its perimeter | Surfaces stay separate, appear as detached circles, or create visible seams |
 | **MEMBRANE** | One interactive glass effect shaped by a custom `@Animatable Shape`, lateral contour deforms on press | Ends flex elastically while central glass and typography remain stable | Material fails to track deformation or reads as a mere inflated capsule |
+| **OPTICAL_LIP** | A separate continuous native-glass annulus expands around the stationary central capsule | A visible uninterrupted refracting rim appears on all four sides, while the central glass/text stay fixed | The ring breaks, renders opaque, or appears as a decorative drawn border |
 
 **Controlled conditions:** dark mode; identical 274×80 pt START label; 1.2-second real XCUITest hold; fixed panel and neutral optical grid behind the material. The core must not be uniformly scaled. No colored underlay, tint or artificial glow.
 
@@ -45,6 +46,6 @@ For accurate animation fidelity, prefer checking on a physical ProMotion iPhone;
 
 1. Native Liquid Glass, no colored fill.
 2. Core and text remain in place; no uniform whole-button scaling authored by us.
-3. Clear difference in response between the three mechanisms.
+3. Clear difference in response between the four mechanisms.
 4. No unexpected double surfaces or seams.
 5. Repeatable real holds and clean return to idle.

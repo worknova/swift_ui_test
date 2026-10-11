@@ -3,7 +3,7 @@ import XCTest
 final class TDIInteractionUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testThreeDistinctPhysicalHolds() throws {
+    func testFourDistinctPhysicalHolds() throws {
         let app = XCUIApplication()
         app.launch()
 
@@ -11,8 +11,8 @@ final class TDIInteractionUITests: XCTestCase {
         let releases = app.staticTexts["tdiReleaseCounter"]
         let next = app.buttons["tdiNextHypothesis"]
         XCTAssertTrue(signature.waitForExistence(timeout: 25))
-        for (index, code) in ["SYSTEM", "MORPH", "MEMBRANE"].enumerated() {
-            let expected = "\(index + 1)/3|\(code)|NEUTRAL|HOLD-1.2"
+        for (index, code) in ["SYSTEM", "MORPH", "MEMBRANE", "OPTICAL_LIP"].enumerated() {
+            let expected = "\(index + 1)/4|\(code)|NEUTRAL|HOLD-1.2"
             XCTAssertEqual(signature.label, expected)
             let button = app.buttons["tdi\(code)Button"]
             XCTAssertTrue(button.waitForExistence(timeout: 8))
@@ -24,8 +24,8 @@ final class TDIInteractionUITests: XCTestCase {
             button.press(forDuration: 1.2)
             XCTAssertEqual(releases.label, "RELEASES 1")
             Thread.sleep(forTimeInterval: 0.9)
-            if index < 2 { next.tap() }
+            if index < 3 { next.tap() }
         }
-        XCTAssertEqual(signature.label, "3/3|MEMBRANE|NEUTRAL|HOLD-1.2")
+        XCTAssertEqual(signature.label, "4/4|OPTICAL_LIP|NEUTRAL|HOLD-1.2")
     }
 }

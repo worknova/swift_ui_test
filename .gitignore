@@ -1,0 +1,5 @@
+DerivedData/
+*.xcodeproj/
+*.xcresult
+.DS_Store
+tdi-output/

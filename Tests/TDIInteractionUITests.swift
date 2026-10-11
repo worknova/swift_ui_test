@@ -11,7 +11,7 @@ final class TDIInteractionUITests: XCTestCase {
         let releases = app.staticTexts["tdiReleaseCounter"]
         let next = app.buttons["tdiNextHypothesis"]
         XCTAssertTrue(signature.waitForExistence(timeout: 25))
-        for (index, code) in ["SYSTEM", "LENS", "MEMBRANE"].enumerated() {
+        for (index, code) in ["SYSTEM", "MORPH", "MEMBRANE"].enumerated() {
             let expected = "\(index + 1)/3|\(code)|NEUTRAL|HOLD-1.2"
             XCTAssertEqual(signature.label, expected)
             let button = app.buttons["tdi\(code)Button"]
@@ -19,6 +19,7 @@ final class TDIInteractionUITests: XCTestCase {
             XCTAssertEqual(button.label, "START")
             XCTAssertEqual(button.value as? String, "\(code)|NEUTRAL|GLASS")
             XCTAssertEqual(releases.label, "RELEASES 0")
+            // Inspect a stable pre-touch scene before the real interaction.
             Thread.sleep(forTimeInterval: 1.0)
             button.press(forDuration: 1.2)
             XCTAssertEqual(releases.label, "RELEASES 1")

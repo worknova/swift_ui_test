@@ -94,21 +94,23 @@ metrics = {
     "gaps_over_100ms": sum(g>0.1 for g in gaps),
     "gaps_over_250ms": sum(g>0.25 for g in gaps),
     "gaps_over_1s": sum(g>1 for g in gaps),
-    "review_frame_rate": 60,
-    "review_note": "Review FPS is an output timebase with duplicated source frames, not capture FPS."
+    "optional_review_frame_rate": 60,
+    "review_note": "Optional review FPS is an output timebase with duplicated source frames, not capture FPS."
 }
 (root / "frame-quality.json").write_text(json.dumps(metrics,indent=2)+"\n")
 
-# Review version only. Never use this re-timed clip for press-duration analysis.
-vf = "setpts='if(eq(N,0),0,PREV_OUTPTS+min(PTS-PREV_INPTS,0.8/TB))',fps=60,format=yuv420p"
-with (root / "transcode.log").open("w") as log:
-    result = subprocess.run([
-        "ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error",
-        "-i", str(original), "-an", "-vf", vf, "-c:v", "libx264",
-        "-preset", "veryfast", "-crf", "18",
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-        "-y", str(review)
-    ],stdout=log,stderr=subprocess.STDOUT,timeout=360)
-if result.returncode != 0 or not review.exists():
-    raise RuntimeError("Failed to encode 60 FPS review MP4")
+# Review encoding is optional and never changes original VFR evidence.
+# Run full-rate conversion only on explicit request; avoid expensive re-encode.
+if os.environ.get("TDI_MAKE_REVIEW_60FPS", "false").lower() == "true":
+    vf = "fps=60,format=yuv420p"
+    with (root / "transcode.log").open("w") as log:
+        result = subprocess.run([
+            "ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error",
+            "-i", str(original), "-an", "-vf", vf, "-c:v", "libx264",
+            "-preset", "veryfast", "-crf", "18",
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            "-y", str(review)
+        ], stdout=log, stderr=subprocess.STDOUT, timeout=360)
+    if result.returncode != 0 or not review.exists():
+        raise RuntimeError("Failed to encode optional 60 FPS review MP4")
 print("PASS:", json.dumps(metrics), flush=True)

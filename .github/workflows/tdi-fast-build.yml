@@ -1,0 +1,47 @@
+name: TDI Fast Build
+on:
+  workflow_dispatch:
+  push:
+    branches: [tdi-system-morph-membrane-20261012]
+    paths:
+      - '.github/tdi-build.request'
+permissions:
+  contents: read
+concurrency:
+  group: tdi-fast-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Measure FAST build
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tdi-output
+          start=$SECONDS
+          echo "Xcode: $(xcodebuild -version)"
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          xcodegen generate --spec project.yml
+          echo "setup_seconds=$((SECONDS-start))" | tee tdi-output/fast-timing.txt
+          build_start=$SECONDS
+          xcodebuild build-for-testing \
+            -project TDILab.xcodeproj -scheme TDILab \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath DerivedData -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO > tdi-output/build.log 2>&1 || {
+              tail -n 160 tdi-output/build.log
+              exit 1
+            }
+          echo "build_seconds=$((SECONDS-build_start))" | tee -a tdi-output/fast-timing.txt
+          echo "total_seconds=$SECONDS" | tee -a tdi-output/fast-timing.txt
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tdi-fast-build-logs
+          path: tdi-output/
+          retention-days: 7
+          if-no-files-found: warn

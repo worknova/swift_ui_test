@@ -41,7 +41,7 @@ private enum TDIMode: Int, CaseIterable {
         }
     }
 
-    var signature: String { "\(rawValue + 1)/3|\(code)|NEUTRAL|HOLD-1.2" }
+    var signature: String { "\(rawValue + 1)/\(TDIMode.allCases.count)|\(code)|NEUTRAL|HOLD-1.2" }
     var buttonIdentifier: String { "tdi\(code)Button" }
 }
 

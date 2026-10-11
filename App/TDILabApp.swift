@@ -1,7 +1,9 @@
 import SwiftUI
 
-// A single optically neutral test scene for three independent hypotheses.
-// No colored backing, no tint and no system-press substitute animation.
+// TDI optical comparison: three mechanisms, one fixed geometry, one real touch.
+// Minimum deployment: iOS 26. The ONLY rendered material is native Liquid Glass.
+// No colored tint, painted halo, gradients, or full-button scaleEffect.
+
 @main
 struct TDILabApp: App {
     var body: some Scene {
@@ -10,29 +12,29 @@ struct TDILabApp: App {
 }
 
 private enum TDIMode: Int, CaseIterable {
-    case system, lens, membrane
+    case system, morph, membrane
 
     var code: String {
         switch self {
         case .system: "SYSTEM"
-        case .lens: "LENS"
+        case .morph: "MORPH"
         case .membrane: "MEMBRANE"
         }
     }
 
     var title: String {
         switch self {
-        case .system: "Native interactive glass"
-        case .lens: "Peripheral glass lens"
-        case .membrane: "Elastic glass membrane"
+        case .system: "System glass response"
+        case .morph: "Glass surface morphing"
+        case .membrane: "Local edge deformation"
         }
     }
 
     var question: String {
         switch self {
-        case .system: "Does the native interaction create sufficient optical depth?"
-        case .lens: "Does a separate glass perimeter read as a raised lens?"
-        case .membrane: "Can the ends flex without enlarging the button core?"
+        case .system: "Can native interactive glass create the lens on its own?"
+        case .morph: "Will peripheral glass volumes merge into the fixed core?"
+        case .membrane: "Can only the ends deform, without core scaling?"
         }
     }
 
@@ -40,10 +42,41 @@ private enum TDIMode: Int, CaseIterable {
     var buttonIdentifier: String { "tdi\(code)Button" }
 }
 
+// Fixed monochrome optical reference for observing the glass refraction.
+// This is content BEHIND glass, not a fill or tint applied to the button.
+private struct TDIOpticalReference: View {
+    var body: some View {
+        Canvas { context, size in
+            var lines = Path()
+            let step: CGFloat = 20
+            for x in stride(from: step, through: size.width, by: step) {
+                lines.move(to: CGPoint(x: x, y: 0))
+                lines.addLine(to: CGPoint(x: x, y: size.height))
+            }
+            for y in stride(from: step, through: size.height, by: step) {
+                lines.move(to: CGPoint(x: 0, y: y))
+                lines.addLine(to: CGPoint(x: size.width, y: y))
+            }
+            context.stroke(lines, with: .color(.white.opacity(0.105)), lineWidth: 0.7)
+
+            // Four fixed measurement marks. No dynamic colored underlight.
+            for dx in [-95.0, -32.0, 32.0, 95.0] {
+                let circle = Path(ellipseIn: CGRect(
+                    x: size.width / 2 + dx - 1.4,
+                    y: size.height / 2 - 1.4,
+                    width: 2.8, height: 2.8
+                ))
+                context.fill(circle, with: .color(.white.opacity(0.48)))
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct TDIExperimentScreen: View {
     @State private var mode: TDIMode = .system
-    @State private var releases = 0
-
+    @State private var releases: Int = 0
     private let backdrop = Color(red: 0.035, green: 0.045, blue: 0.065)
     private let panel = Color(red: 0.07, green: 0.12, blue: 0.18)
 
@@ -52,10 +85,10 @@ struct TDIExperimentScreen: View {
             backdrop.ignoresSafeArea()
 
             VStack(spacing: 16) {
-                Text("TDI · NATIVE GLASS LAB")
+                Text("TDI · LIQUID GLASS PRESS LAB")
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(1.3)
-                    .foregroundStyle(.white.opacity(0.64))
+                    .foregroundStyle(.white.opacity(0.66))
 
                 Text(mode.title)
                     .font(.system(size: 22, weight: .semibold))
@@ -69,6 +102,10 @@ struct TDIExperimentScreen: View {
 
                 RoundedRectangle(cornerRadius: 18)
                     .fill(panel)
+                    .overlay {
+                        TDIOpticalReference()
+                            .clipShape(.rect(cornerRadius: 18))
+                    }
                     .frame(maxWidth: 390)
                     .frame(height: 242)
                     .overlay { experimentalButton }
@@ -92,9 +129,9 @@ struct TDIExperimentScreen: View {
                 .disabled(mode == .membrane)
                 .accessibilityIdentifier("tdiNextHypothesis")
 
-                Text("One 274 × 80 pt core · one 1.2 s long press")
+                Text("Same 274 × 80 pt core · hold 1.2 seconds")
                     .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.46))
+                    .foregroundStyle(.white.opacity(0.48))
             }
             .padding(18)
         }
@@ -110,30 +147,30 @@ struct TDIExperimentScreen: View {
             .contentShape(Capsule())
     }
 
-    private func recordRelease() { releases += 1 }
+    private func onRelease() { releases += 1 }
 
     @ViewBuilder
     private var experimentalButton: some View {
         switch mode {
         case .system:
-            Button(action: recordRelease) { startLabel }
+            Button(action: onRelease) { startLabel }
                 .buttonStyle(.plain)
-                // H1: the native interaction system is the entire mechanism.
+                // H1: native response, zero custom geometry or press animation.
                 .glassEffect(.regular.interactive(), in: .capsule)
                 .accessibilityLabel("START")
                 .accessibilityIdentifier(mode.buttonIdentifier)
                 .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
 
-        case .lens:
-            Button(action: recordRelease) { startLabel }
-                .buttonStyle(TDIPeripheralLensStyle())
+        case .morph:
+            Button(action: onRelease) { startLabel }
+                .buttonStyle(TDIMorphStyle())
                 .accessibilityLabel("START")
                 .accessibilityIdentifier(mode.buttonIdentifier)
                 .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
 
         case .membrane:
-            Button(action: recordRelease) { startLabel }
-                .buttonStyle(TDIElasticEdgeStyle())
+            Button(action: onRelease) { startLabel }
+                .buttonStyle(TDIMembraneStyle())
                 .accessibilityLabel("START")
                 .accessibilityIdentifier(mode.buttonIdentifier)
                 .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
@@ -141,92 +178,122 @@ struct TDIExperimentScreen: View {
     }
 }
 
-// H2: the glass core never changes size or color. An annular glass
-// perimeter appears at touch-down. It is a second *system glass surface*,
-// not an opaque border, a glow, or a colored backing.
-private struct TDIPeripheralLensStyle: ButtonStyle {
+// H2 — Native glass geometry transition, NOT a capsule scaled up.
+// The 274x80 core never changes. During touch-down, two native glass
+// satellite surfaces are inserted next to its ends, where the shared
+// GlassEffectContainer can morph/merge their geometry into the core.
+// Matched-geometry changes are restricted to GLASS (text remains still).
+private struct TDIMorphStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        GlassEffectContainer(spacing: 0) {
-            ZStack {
-                Color.clear
-                    .frame(width: 274, height: 80)
-                    .glassEffect(.regular, in: .capsule)
-                    .allowsHitTesting(false)
+        TDIMorphBody(configuration: configuration)
+    }
 
-                Color.clear
-                    .frame(width: 304, height: 108)
-                    .glassEffect(.regular, in: .capsule)
-                    .mask {
-                        Capsule()
-                            .strokeBorder(Color.white, lineWidth: 10)
-                            .frame(width: 304, height: 108)
+    private struct TDIMorphBody: View {
+        let configuration: ButtonStyle.Configuration
+        @Namespace private var glassNamespace
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            GlassEffectContainer(spacing: 22) {
+                ZStack {
+                    // The real, hit-testable Button label owns interactive glass.
+                    configuration.label
+                        .frame(width: 274, height: 80)
+                        .glassEffect(.regular.interactive(), in: .capsule)
+                        .glassEffectID("core", in: glassNamespace)
+
+                    if configuration.isPressed {
+                        Color.clear
+                            .frame(width: 66, height: 66)
+                            .glassEffect(.regular, in: .circle)
+                            .glassEffectID("west", in: glassNamespace)
+                            .glassEffectTransition(.matchedGeometry)
+                            .offset(x: -126)
+                            .allowsHitTesting(false)
+
+                        Color.clear
+                            .frame(width: 66, height: 66)
+                            .glassEffect(.regular, in: .circle)
+                            .glassEffectID("east", in: glassNamespace)
+                            .glassEffectTransition(.matchedGeometry)
+                            .offset(x: 126)
+                            .allowsHitTesting(false)
                     }
-                    .opacity(configuration.isPressed ? 1 : 0)
-                    .allowsHitTesting(false)
-
-                configuration.label
-                    .frame(width: 274, height: 80)
+                }
+                .frame(width: 322, height: 126)
             }
-            .frame(width: 322, height: 126)
+            .contentShape(Rectangle())
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.78),
+                value: configuration.isPressed
+            )
         }
-        .contentShape(Rectangle())
-        .animation(.spring(response: 0.22, dampingFraction: 0.78),
-                   value: configuration.isPressed)
     }
 }
 
-// H3: the glass geometry changes only near the ends. The central
-// 274x80 region and the START label keep their location and size.
+// H3 — One interactive glass surface with a custom animatable Shape.
+// No overlaid glass, fake border, or scaled center. Only the lateral
+// contours deform; the top/bottom center and START stay stationary.
+@Animatable
 private struct TDIElasticOutline: Shape {
     var deformation: CGFloat
 
-    var animatableData: CGFloat {
-        get { deformation }
-        set { deformation = newValue }
-    }
-
     func path(in rect: CGRect) -> Path {
-        let cx = rect.midX, cy = rect.midY
-        let l = cx - 137, r = cx + 137
-        let t = cy - 40, b = cy + 40
+        let cx = rect.midX
+        let cy = rect.midY
+        let left = cx - 137
+        let right = cx + 137
+        let top = cy - 40
+        let bottom = cy + 40
         let d = max(0, min(1, deformation)) * 14
+
         var path = Path()
-        path.move(to: CGPoint(x: l + 40, y: t))
-        path.addLine(to: CGPoint(x: r - 40, y: t))
-        path.addCurve(to: CGPoint(x: r + d, y: cy),
-                      control1: CGPoint(x: r - 14, y: t),
-                      control2: CGPoint(x: r + d, y: t + 15))
-        path.addCurve(to: CGPoint(x: r - 40, y: b),
-                      control1: CGPoint(x: r + d, y: b - 15),
-                      control2: CGPoint(x: r - 14, y: b))
-        path.addLine(to: CGPoint(x: l + 40, y: b))
-        path.addCurve(to: CGPoint(x: l - d, y: cy),
-                      control1: CGPoint(x: l + 14, y: b),
-                      control2: CGPoint(x: l - d, y: b - 15))
-        path.addCurve(to: CGPoint(x: l + 40, y: t),
-                      control1: CGPoint(x: l - d, y: t + 15),
-                      control2: CGPoint(x: l + 14, y: t))
+        path.move(to: CGPoint(x: left + 40, y: top))
+        path.addLine(to: CGPoint(x: right - 40, y: top))
+        path.addCurve(
+            to: CGPoint(x: right + d, y: cy),
+            control1: CGPoint(x: right - 14, y: top),
+            control2: CGPoint(x: right + d, y: top + 15)
+        )
+        path.addCurve(
+            to: CGPoint(x: right - 40, y: bottom),
+            control1: CGPoint(x: right + d, y: bottom - 15),
+            control2: CGPoint(x: right - 14, y: bottom)
+        )
+        path.addLine(to: CGPoint(x: left + 40, y: bottom))
+        path.addCurve(
+            to: CGPoint(x: left - d, y: cy),
+            control1: CGPoint(x: left + 14, y: bottom),
+            control2: CGPoint(x: left - d, y: bottom - 15)
+        )
+        path.addCurve(
+            to: CGPoint(x: left + 40, y: top),
+            control1: CGPoint(x: left - d, y: top + 15),
+            control2: CGPoint(x: left + 14, y: top)
+        )
         path.closeSubpath()
         return path
     }
 }
 
-private struct TDIElasticEdgeStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        ZStack {
-            Color.clear
-                .frame(width: 322, height: 126)
-                .glassEffect(.regular, in: TDIElasticOutline(
-                    deformation: configuration.isPressed ? 1 : 0
-                ))
-                .allowsHitTesting(false)
+private struct TDIMembraneStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-            configuration.label
-                .frame(width: 274, height: 80)
-        }
-        .frame(width: 322, height: 126)
-        .contentShape(Rectangle())
-        .animation(.spring(response: 0.24, dampingFraction: 0.69),
-                   value: configuration.isPressed)
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: 322, height: 126)
+            // Glass attached to the actual interactive button label,
+            // not a Color.clear sibling with disabled hit-testing.
+            .glassEffect(
+                .regular.interactive(),
+                in: TDIElasticOutline(
+                    deformation: (!reduceMotion && configuration.isPressed) ? 1 : 0
+                )
+            )
+            .contentShape(Rectangle())
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.69),
+                value: configuration.isPressed
+            )
     }
 }

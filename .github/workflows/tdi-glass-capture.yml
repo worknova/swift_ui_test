@@ -1,6 +1,10 @@
 name: TDI Glass Capture
 on:
   workflow_dispatch:
+  push:
+    branches: [tdi-system-morph-membrane-20261012]
+    paths:
+      - '.github/tdi-capture.request'
 permissions:
   contents: read
 jobs:
@@ -43,13 +47,13 @@ jobs:
         run: |
           mkdir -p tdi-output
           xcodebuild build-for-testing -project TDILab.xcodeproj -scheme TDILab -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" -derivedDataPath DerivedData -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO > tdi-output/build.log 2>&1 || { tail -n 120 tdi-output/build.log; exit 1; }
-      - name: Record three real native press interactions
+      - name: Record four real native press interactions
         run: python3 scripts/record_tdi.py
       - name: Upload native recording and audit logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tdi-native-three-hypotheses
+          name: tdi-native-four-hypotheses
           path: tdi-output/
           compression-level: 0
           retention-days: 14

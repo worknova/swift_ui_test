@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture 3 native physical holds in one XCTest session."""
+"""Capture 4 native physical holds in one XCTest session."""
 import json
 import os
 from pathlib import Path
@@ -24,7 +24,7 @@ test_cmd = [
     "-project", "TDILab.xcodeproj", "-scheme", "TDILab",
     "-destination", f"platform=iOS Simulator,id={udid}",
     "-derivedDataPath", "DerivedData", "-parallel-testing-enabled", "NO",
-    "-only-testing:TDILabUITests/TDIInteractionUITests/testThreeDistinctPhysicalHolds",
+    "-only-testing:TDILabUITests/TDIInteractionUITests/testFourDistinctPhysicalHolds",
     "CODE_SIGNING_ALLOWED=NO",
 ]
 recorder = None

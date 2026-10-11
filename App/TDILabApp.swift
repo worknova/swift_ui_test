@@ -1,6 +1,6 @@
 import SwiftUI
 
-// TDI optical comparison: three mechanisms, one fixed geometry, one real touch.
+// TDI optical comparison: four mechanisms, one fixed geometry, one real touch.
 // Minimum deployment: iOS 26. The ONLY rendered material is native Liquid Glass.
 // No colored tint, painted halo, gradients, or full-button scaleEffect.
 
@@ -12,13 +12,14 @@ struct TDILabApp: App {
 }
 
 private enum TDIMode: Int, CaseIterable {
-    case system, morph, membrane
+    case system, morph, membrane, opticalLip
 
     var code: String {
         switch self {
         case .system: "SYSTEM"
         case .morph: "MORPH"
         case .membrane: "MEMBRANE"
+        case .opticalLip: "OPTICAL_LIP"
         }
     }
 
@@ -27,6 +28,7 @@ private enum TDIMode: Int, CaseIterable {
         case .system: "System glass response"
         case .morph: "Glass surface morphing"
         case .membrane: "Local edge deformation"
+        case .opticalLip: "Continuous optical rim"
         }
     }
 
@@ -35,6 +37,7 @@ private enum TDIMode: Int, CaseIterable {
         case .system: "Can native interactive glass create the lens on its own?"
         case .morph: "Will peripheral glass volumes merge into the fixed core?"
         case .membrane: "Can only the ends deform, without core scaling?"
+        case .opticalLip: "Can a real glass annulus grow around a fixed core?"
         }
     }
 
@@ -126,7 +129,7 @@ struct TDIExperimentScreen: View {
                     releases = 0
                 }
                 .buttonStyle(.bordered)
-                .disabled(mode == .membrane)
+                .disabled(mode == .opticalLip)
                 .accessibilityIdentifier("tdiNextHypothesis")
 
                 Text("Same 274 × 80 pt core · hold 1.2 seconds")
@@ -171,6 +174,13 @@ struct TDIExperimentScreen: View {
         case .membrane:
             Button(action: onRelease) { startLabel }
                 .buttonStyle(TDIMembraneStyle())
+                .accessibilityLabel("START")
+                .accessibilityIdentifier(mode.buttonIdentifier)
+                .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
+
+        case .opticalLip:
+            Button(action: onRelease) { startLabel }
+                .buttonStyle(TDIOpticalLipStyle())
                 .accessibilityLabel("START")
                 .accessibilityIdentifier(mode.buttonIdentifier)
                 .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
@@ -295,5 +305,78 @@ private struct TDIMembraneStyle: ButtonStyle {
                 reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.69),
                 value: configuration.isPressed
             )
+    }
+}
+
+// H4 — PERIPHERAL LENS / OPTICAL LIP.
+// A continuous, real GLASS annulus encircles a dimensionally fixed core.
+// During touch-down the outside edge grows in all directions, while the
+// inside edge, glass core and typography remain stationary.
+//
+// The annular Shape uses *opposite winding* for inner/outer subpaths,
+// i.e. it describes a real hole without post-material .mask / .opacity
+// tricks that can flatten the glass lens. Whether the native material
+// honors the expected inner refraction must be verified on the iPhone.
+@Animatable
+private struct TDIContinuousGlassLip: Shape {
+    var emergence: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let t = max(0, min(1, emergence))
+        let base = CGRect(x: rect.midX - 137, y: rect.midY - 40,
+                          width: 274, height: 80)
+        // Inner lip overlaps the unchanged core by 2 points, to prevent
+        // a transparent gap during the system compositing transition.
+        let inner = base.insetBy(dx: 2, dy: 2)
+        // This is a separate peripheral GLASS surface, not the core scaled.
+        let outer = base.insetBy(dx: -18 * t, dy: -18 * t)
+        var lens = Path()
+        lens.addRoundedRect(
+            in: outer,
+            cornerSize: CGSize(width: outer.height / 2, height: outer.height / 2)
+        )
+        var aperture = Path()
+        aperture.addRoundedRect(
+            in: inner,
+            cornerSize: CGSize(width: inner.height / 2, height: inner.height / 2)
+        )
+        // Reflecting horizontally flips winding. A nonzero-fill renderer
+        // therefore treats the inner capsule as a hole.
+        let invertWinding = CGAffineTransform(
+            translationX: rect.midX * 2, y: 0
+        ).scaledBy(x: -1, y: 1)
+        lens.addPath(aperture, transform: invertWinding)
+        return lens
+    }
+}
+
+private struct TDIOpticalLipStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        ZStack {
+            // Render system material only in the external rim. This
+            // layer is visual; it never competes for physical touches.
+            Color.clear
+                .frame(width: 330, height: 130)
+                .glassEffect(
+                    .regular,
+                    in: TDIContinuousGlassLip(
+                        emergence: (!reduceMotion && configuration.isPressed) ? 1 : 0
+                    )
+                )
+                .opacity(configuration.isPressed && !reduceMotion ? 1 : 0)
+                .allowsHitTesting(false)
+
+            configuration.label
+                .frame(width: 274, height: 80)
+                .glassEffect(.regular.interactive(), in: .capsule)
+        }
+        .frame(width: 330, height: 130)
+        .contentShape(Rectangle())
+        .animation(
+            reduceMotion ? nil : .spring(response: 0.19, dampingFraction: 0.77),
+            value: configuration.isPressed
+        )
     }
 }

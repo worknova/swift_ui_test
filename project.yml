@@ -1,0 +1,32 @@
+name: TDILab
+options:
+  bundleIdPrefix: dev.worknova
+  deploymentTarget:
+    iOS: '26.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    CODE_SIGNING_ALLOWED: 'NO'
+targets:
+  TDILab:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/TDILabApp.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.worknova.TDILab
+        GENERATE_INFOPLIST_FILE: 'YES'
+        TARGETED_DEVICE_FAMILY: '1,2'
+  TDILabUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/TDIInteractionUITests.swift
+    dependencies:
+      - target: TDILab
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: 'YES'
+        PRODUCT_BUNDLE_IDENTIFIER: dev.worknova.TDILabUITests
+        TEST_TARGET_NAME: TDILab

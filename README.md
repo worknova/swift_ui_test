@@ -32,15 +32,16 @@ xcodebuild build-for-testing -project TDILab.xcodeproj -scheme TDILab \
   -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO
 ```
 
-## Capture
+## CI modes
 
-The manual-only `TDI Glass Capture` workflow builds once, launches one sequential XCTest, and exports:
+CI is **opt-in**, and the two workflows are independent. Neither starts on ordinary source commits.
 
-- Original H.264 VFR screen recording with simulator-provided timestamps.
-- Separate 60 FPS playback copy, with potentially duplicated frames (never claim 60 unique captured frames).
-- `frame-quality.json` listing decoded source frames and timing gaps, plus logs.
+- **FAST BUILD** — [`.github/workflows/tdi-fast-build.yml`](.github/workflows/tdi-fast-build.yml). Invoke via `workflow_dispatch`, or by updating `.github/tdi-build.request` on this branch. Compiles the native app **and XCTest bundle** with a generic iOS Simulator destination. Does **not** boot a device, run tests, or record video. Uploads build diagnostics and stage timings.
+- **CAPTURE** — [`.github/workflows/tdi-glass-capture.yml`](.github/workflows/tdi-glass-capture.yml). Invoke via `workflow_dispatch`, or by updating `.github/tdi-capture.request`. Boots one iPhone simulator without waiting, builds while it boots, then waits for readiness and runs four physical XCTest holds. Uploads the original H.264 **VFR** recording, raw decoded-frame timing metrics, build and XCTest logs and stage timings. Optionally encode a separate 60 FPS review with the `make_review_60fps` input; default **false** for faster CI. The review may duplicate frames and is not frame-rate evidence.
 
-For accurate animation fidelity, prefer checking on a physical ProMotion iPhone; CI simulator video cannot prove 60 or 120 distinct frames/s. Keep Reduced Motion/Transparency in mind when interpreting system rendering.
+Run FAST first after source changes; run CAPTURE when native interaction/optics need evaluation. They intentionally use *separate fresh GitHub runners* so passing FAST does not transfer any compiled cache to CAPTURE. Do not chain them as two sequential jobs in one full capture: this would add cold-runner overhead.
+
+The video is not a substitute for real-device evaluation. CI's simulator cannot prove 60/120 unique captured frames each second, and XCTest success does not establish perceptual equivalence to the reference.
 
 ## Acceptance
 

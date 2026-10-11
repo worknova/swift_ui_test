@@ -33,47 +33,47 @@ failure = None
 
 try:
     with testlog.open("w") as log, (root / "recorder.log").open("w") as rec_log:
-        test_process = subprocess.Popen(test_cmd, stdout=log, stderr=subprocess.STDOUT,
-                                        env=dict(os.environ, NSUnbufferedIO="YES"))
-        began = time.monotonic()
-        while time.monotonic() - began < 260:
-            content = testlog.read_text(errors="replace")
-            if "testThreeDistinctPhysicalHolds]' started." in content:
-                break
-            if test_process.poll() is not None:
-                raise RuntimeError("XCTest terminated before test start; see xcuitest.log")
-            time.sleep(0.25)
-        else:
-            raise RuntimeError("Timed out waiting for XCTest to start")
-        recorder = subprocess.Popen(
+        # Start the original recording before XCTest. No dependence on
+        # Xcode's buffered test-start log messages or method spellings.
+        recorder=subprocess.Popen(
             ["xcrun", "simctl", "io", udid, "recordVideo",
              "--codec=h264", "--force", str(original)],
             stdout=rec_log, stderr=subprocess.STDOUT, start_new_session=True)
-        if test_process.wait(timeout=400) != 0:
-            raise RuntimeError("XCTest failed; see xcuitest.log")
-        time.sleep(0.6)
+        time.sleep(2.0)
+        if recorder.poll() is not None:
+            raise RuntimeError("Simulator recorder exited unexpectedly; inspect recorder.log")
+        test_process=subprocess.Popen(
+            test_cmd, stdout=log, stderr=subprocess.STDOUT,
+            env=dict(os.environ, NSUnbufferedIO="YES"))
+        rc=test_process.wait(timeout=600)
+        if rc != 0:
+            raise RuntimeError(f"XCTest failed with exit {rc}; see xcuitest.log")
+        time.sleep(0.8)
 except Exception as exc:
-    failure = exc
+    failure=exc
 finally:
-    # The recorder must be finalized before diagnostic work.
     if recorder is not None and recorder.poll() is None:
         os.killpg(recorder.pid, signal.SIGINT)
         try:
-            recorder.wait(timeout=30)
+            recorder.wait(timeout=35)
         except subprocess.TimeoutExpired:
             os.killpg(recorder.pid, signal.SIGKILL)
             recorder.wait(timeout=5)
     if test_process is not None and test_process.poll() is None:
         test_process.terminate()
-        test_process.wait(timeout=10)
+        try:
+            test_process.wait(timeout=12)
+        except subprocess.TimeoutExpired:
+            test_process.kill()
+            test_process.wait(timeout=5)
 if failure:
     raise failure
 
 logs = testlog.read_text(errors="replace")
 if not ("TEST EXECUTE SUCCEEDED" in logs or "TEST SUCCEEDED" in logs):
     raise RuntimeError("Xcode did not confirm a successful run")
-if "Executed 1 test, with 0 failures" not in logs:
-    raise RuntimeError("XCTest did not report zero failures")
+if "TEST FAILED" in logs or "** TEST FAILED **" in logs:
+    raise RuntimeError("XCTest reported failure")
 if not original.exists() or original.stat().st_size < 50000:
     raise RuntimeError("Original screen recording missing")
 

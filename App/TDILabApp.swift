@@ -188,63 +188,49 @@ struct TDIExperimentScreen: View {
     }
 }
 
-// H2 — Native glass geometry transition, NOT a capsule scaled up.
-// The 274x80 core never changes. During touch-down, two native glass
-// satellite surfaces become visible next to its ends, where the shared
-// GlassEffectContainer may blend their geometry with the core.
-// Matched-geometry changes are restricted to GLASS (text remains still).
+// H2 — Peripheral native-glass merging, with stable button hit testing.
+// Touch input belongs only to configuration.label, at 274x80 pt.
+// The GlassEffectContainer lives entirely in the non-hit-testing background.
+// Morph material may change on press without replacing or resizing the Button.
 private struct TDIMorphStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
-        TDIMorphBody(configuration: configuration)
-    }
+        configuration.label
+            .frame(width: 274, height: 80)
+            .contentShape(Capsule())
+            .background {
+                GlassEffectContainer(spacing: 22) {
+                    ZStack {
+                        Color.clear
+                            .frame(width: 274, height: 80)
+                            .glassEffect(.regular, in: .capsule)
 
-    private struct TDIMorphBody: View {
-        let configuration: ButtonStyle.Configuration
-        @Namespace private var glassNamespace
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+                        Color.clear
+                            .frame(width: 66, height: 66)
+                            .glassEffect(
+                                configuration.isPressed && !reduceMotion ? .regular : .identity,
+                                in: .circle
+                            )
+                            .offset(x: -126)
 
-        var body: some View {
-            GlassEffectContainer(spacing: 22) {
-                ZStack {
-                    // The real, hit-testable Button label owns interactive glass.
-                    configuration.label
-                        .frame(width: 274, height: 80)
-                        .glassEffect(.regular.interactive(), in: .capsule)
-                        .glassEffectID("core", in: glassNamespace)
-
-                    // Keep both satellite views mounted for the entire gesture.
-                    // A press must never insert/remove hit-test relevant views:
-                    // previous conditional insertion cancelled the Button action.
-                    Color.clear
-                        .frame(width: 66, height: 66)
-                        .glassEffect(
-                            configuration.isPressed && !reduceMotion ? .regular : .identity,
-                            in: .circle
-                        )
-                        .glassEffectID("west", in: glassNamespace)
-                        .glassEffectTransition(.matchedGeometry)
-                        .offset(x: -126)
-                        .allowsHitTesting(false)
-
-                    Color.clear
-                        .frame(width: 66, height: 66)
-                        .glassEffect(
-                            configuration.isPressed && !reduceMotion ? .regular : .identity,
-                            in: .circle
-                        )
-                        .glassEffectID("east", in: glassNamespace)
-                        .glassEffectTransition(.matchedGeometry)
-                        .offset(x: 126)
-                        .allowsHitTesting(false)
+                        Color.clear
+                            .frame(width: 66, height: 66)
+                            .glassEffect(
+                                configuration.isPressed && !reduceMotion ? .regular : .identity,
+                                in: .circle
+                            )
+                            .offset(x: 126)
+                    }
+                    .frame(width: 322, height: 126)
                 }
-                .frame(width: 322, height: 126)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
-            .contentShape(Rectangle())
             .animation(
                 reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.78),
                 value: configuration.isPressed
             )
-        }
     }
 }
 
@@ -293,21 +279,27 @@ private struct TDIElasticOutline: Shape {
     }
 }
 
+// The animated material is a background, not the touch surface.
+// This isolates physical button input from the custom changing Shape.
 private struct TDIMembraneStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .frame(width: 322, height: 126)
-            // Glass attached to the actual interactive button label,
-            // not a Color.clear sibling with disabled hit-testing.
-            .glassEffect(
-                .regular.interactive(),
-                in: TDIElasticOutline(
-                    deformation: (!reduceMotion && configuration.isPressed) ? 1 : 0
-                )
-            )
-            .contentShape(Rectangle())
+            .frame(width: 274, height: 80)
+            .contentShape(Capsule())
+            .background {
+                Color.clear
+                    .frame(width: 322, height: 126)
+                    .glassEffect(
+                        .regular,
+                        in: TDIElasticOutline(
+                            deformation: (!reduceMotion && configuration.isPressed) ? 1 : 0
+                        )
+                    )
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
             .animation(
                 reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.69),
                 value: configuration.isPressed
@@ -361,29 +353,33 @@ private struct TDIOpticalLipStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
-        ZStack {
-            // Render system material only in the external rim. This
-            // layer is visual; it never competes for physical touches.
-            Color.clear
-                .frame(width: 330, height: 130)
-                .glassEffect(
-                    .regular,
-                    in: TDIContinuousGlassLip(
-                        emergence: (!reduceMotion && configuration.isPressed) ? 1 : 0
-                    )
-                )
-                .opacity(configuration.isPressed && !reduceMotion ? 1 : 0)
-                .allowsHitTesting(false)
+        configuration.label
+            .frame(width: 274, height: 80)
+            .contentShape(Capsule())
+            .background {
+                ZStack {
+                    // Annular native glass is optical-only; it never takes touch input.
+                    Color.clear
+                        .frame(width: 330, height: 130)
+                        .glassEffect(
+                            .regular,
+                            in: TDIContinuousGlassLip(
+                                emergence: (!reduceMotion && configuration.isPressed) ? 1 : 0
+                            )
+                        )
+                        .opacity(configuration.isPressed && !reduceMotion ? 1 : 0)
 
-            configuration.label
-                .frame(width: 274, height: 80)
-                .glassEffect(.regular.interactive(), in: .capsule)
-        }
-        .frame(width: 330, height: 130)
-        .contentShape(Rectangle())
-        .animation(
-            reduceMotion ? nil : .spring(response: 0.19, dampingFraction: 0.77),
-            value: configuration.isPressed
-        )
+                    Color.clear
+                        .frame(width: 274, height: 80)
+                        .glassEffect(.regular, in: .capsule)
+                }
+                .frame(width: 330, height: 130)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.19, dampingFraction: 0.77),
+                value: configuration.isPressed
+            )
     }
 }

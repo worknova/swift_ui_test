@@ -7,9 +7,9 @@ Four targeted native SwiftUI hypotheses for a compelling physical press response
 | Variant | Mechanism | Prediction | Reject if |
 | --- | --- | --- | --- |
 | **SYSTEM** | One button with `.regular.interactive()`, no authored press animation | Native touch response alone creates a legible, organic lens-like reaction | Only a generic scale/bounce with insufficient rim depth is visible |
-| **MORPH** | `GlassEffectContainer` with two persistent side surfaces switching `.identity` / `.regular` during press; gesture-independent glass background | Glass surfaces visually coalesce near the **fixed 274×80 pt** core, emphasizing its perimeter | Surfaces stay separate, appear as detached circles, or create visible seams |
-| **MEMBRANE** | One non-interactive glass background shaped by a custom `@Animatable Shape`, lateral contour deforms on press | Ends flex elastically while central glass and typography remain stable | Material fails to track deformation or reads as a mere inflated capsule |
-| **OPTICAL_LIP** | A separate continuous native-glass annulus expands around the stationary central capsule | A visible uninterrupted refracting rim appears on all four sides, while the central glass/text stay fixed | The ring breaks, renders opaque, or appears as a decorative drawn border |
+| **MORPH** | `GlassEffectContainer` with two persistent side surfaces switching `.identity` / `.regular`; separate fixed native Button and decorative glass layer | Glass surfaces visually coalesce near the **fixed 274×80 pt** core, emphasizing its perimeter | Surfaces stay separate, appear as detached circles, or create visible seams |
+| **MEMBRANE** | Non-hit-testing glass layer using custom `@Animatable Shape`; a shared ButtonStyle only observes press state | Ends flex elastically while central glass and typography remain stable | Material fails to track deformation or reads as a mere inflated capsule |
+| **OPTICAL_LIP** | A separate native-glass annulus controlled by observed ButtonStyle press state, behind the invariant button label | A visible uninterrupted refracting rim appears on all four sides, while the central glass/text stay fixed | The ring breaks, renders opaque, or appears as a decorative drawn border |
 
 **Controlled conditions:** dark mode; identical 274×80 pt START label; 1.2-second real XCUITest hold; fixed panel and neutral optical grid behind the material. The core must not be uniformly scaled. No colored underlay, tint or artificial glow.
 
@@ -17,7 +17,7 @@ Four targeted native SwiftUI hypotheses for a compelling physical press response
 
 Observe the same stages for each candidate: idle → touch-down → stable hold → release → settled. The optical grid is diagnostic background content, not a button treatment. Compare the peripheral lens, perceived depth, edge continuity, overshoot and return.
 
-A pass in XCTest proves scenario selection and physical interaction — **not optical success**. A native recording must be inspected before judging the winner.
+A pass in XCTest proves scenario selection and Button activation — **not optical success**. A separate `PRESS begin/end` diagnostic records ButtonStyle.isPressed state transitions to distinguish gesture recognition from button action. A native recording must be inspected before judging the winner.
 
 `SYSTEM` is the control. `MORPH` tests system glass blending from persistent satellite shapes (not matched-geometry transitions). `MEMBRANE` tests custom shape deformation. `OPTICAL_LIP` tests a continuous peripheral glass annulus. These are distinct geometry interventions, not scale animation presets.
 

@@ -1,2 +1,3 @@
 FAST BUILD is opt-in. Updating this file triggers the branch-scoped TDI Fast Build workflow.
 Run after Swift parse fix, XCTest restructuring, preflight, and workflow consistency corrections.
+Validate isolated native button and pressed state telemetry after Liquid Glass gesture failures.

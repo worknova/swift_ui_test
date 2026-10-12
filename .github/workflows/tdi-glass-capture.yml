@@ -68,7 +68,7 @@ jobs:
           echo "simulator_start=$(date +%s)" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIMULATOR_UDID" || true
           # Do not wait here: Xcode can build while the simulator initializes.
-      - name: Wait for simulator and record four native holds
+      - name: Record four gestures with Xcode XCTest video
         shell: bash
         run: |
           set -euo pipefail
@@ -88,7 +88,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tdi-native-four-hypotheses
+          name: tdi-xcode-native-screen-recording
           path: tdi-output/
           compression-level: 0
           retention-days: 14

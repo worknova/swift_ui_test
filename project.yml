@@ -30,3 +30,21 @@ targets:
         GENERATE_INFOPLIST_FILE: 'YES'
         PRODUCT_BUNDLE_IDENTIFIER: dev.worknova.TDILabUITests
         TEST_TARGET_NAME: TDILab
+
+# Xcode's own UI automation video recording, retained for passing tests.
+# The old simctl VFR recorder is NOT used as the review video source.
+schemes:
+  TDILab:
+    build:
+      targets:
+        TDILab: all
+        TDILabUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - TDILabUITests
+      captureScreenshotsAutomatically: true
+      deleteScreenshotsWhenEachTestSucceeds: false
+      preferredScreenCaptureFormat: screenRecording

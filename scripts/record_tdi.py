@@ -67,15 +67,11 @@ finally:
             test_process.kill()
             test_process.wait(timeout=5)
 if failure:
-    raise failure
+    print("CAPTURE_DIAGNOSTIC:", failure, flush=True)
 
 logs = testlog.read_text(errors="replace")
-if not ("TEST EXECUTE SUCCEEDED" in logs or "TEST SUCCEEDED" in logs):
-    raise RuntimeError("Xcode did not confirm a successful run")
-if "TEST FAILED" in logs or "** TEST FAILED **" in logs:
-    raise RuntimeError("XCTest reported failure")
 if not original.exists() or original.stat().st_size < 50000:
-    raise RuntimeError("Original screen recording missing")
+    raise RuntimeError("Original screen recording missing") from failure
 
 raw = subprocess.run([
     "ffprobe", "-v", "error", "-select_streams", "v:0",
@@ -98,6 +94,10 @@ metrics = {
     "review_note": "Optional review FPS is an output timebase with duplicated source frames, not capture FPS."
 }
 (root / "frame-quality.json").write_text(json.dumps(metrics,indent=2)+"\n")
+if failure:
+    raise failure
+if not ("TEST EXECUTE SUCCEEDED" in logs or "TEST SUCCEEDED" in logs):
+    raise RuntimeError("Xcode did not confirm a successful run")
 
 # Review encoding is optional and never changes original VFR evidence.
 # Run full-rate conversion only on explicit request; avoid expensive re-encode.

@@ -20,6 +20,13 @@ jobs:
       TDI_MAKE_REVIEW_60FPS: ${{ inputs.make_review_60fps || 'false' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Static Swift and Python preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc -frontend -parse App/TDILabApp.swift Tests/TDIInteractionUITests.swift
+          python3 -m py_compile scripts/record_tdi.py
+          echo "Preflight successful"
       - name: Prepare build and video tools
         shell: bash
         run: |
@@ -31,6 +38,12 @@ jobs:
           command -v ffmpeg
           command -v ffprobe
           xcodegen generate --spec project.yml
+      - name: Build native app and XCTest
+        shell: bash
+        run: |
+          build_start=$(date +%s)
+          xcodebuild build-for-testing -project TDILab.xcodeproj -scheme TDILab -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO > tdi-output/build.log 2>&1 || { tail -n 120 tdi-output/build.log; exit 1; }
+          echo "build_seconds=$(( $(date +%s) - build_start ))" >> tdi-output/stage-timings.txt
       - name: Select and boot iOS Simulator
         shell: bash
         run: |
@@ -55,12 +68,6 @@ jobs:
           echo "simulator_start=$(date +%s)" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIMULATOR_UDID" || true
           # Do not wait here: Xcode can build while the simulator initializes.
-      - name: Build native app and XCTest
-        shell: bash
-        run: |
-          build_start=$(date +%s)
-          xcodebuild build-for-testing -project TDILab.xcodeproj -scheme TDILab -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO > tdi-output/build.log 2>&1 || { tail -n 120 tdi-output/build.log; exit 1; }
-          echo "build_seconds=$(( $(date +%s) - build_start ))" >> tdi-output/stage-timings.txt
       - name: Wait for simulator and record four native holds
         shell: bash
         run: |

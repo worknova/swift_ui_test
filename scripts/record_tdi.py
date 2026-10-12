@@ -63,6 +63,8 @@ for index, path in enumerate(videos):
     ], timeout=120))
     stamps = [float(frame["best_effort_timestamp_time"])
               for frame in info.get("frames", []) if "best_effort_timestamp_time" in frame]
+    order_regressions = sum(b < a for a, b in zip(stamps, stamps[1:]))
+    stamps = sorted(stamps)
     gaps = [b - a for a, b in zip(stamps, stamps[1:])]
     dst = root / f"tdi-xcode-recording-{index + 1}.mp4"
     shutil.copyfile(path, dst)
@@ -73,6 +75,7 @@ for index, path in enumerate(videos):
         "max_frame_gap_seconds": round(max(gaps), 3) if gaps else None,
         "gaps_over_250ms": sum(gap > 0.25 for gap in gaps),
         "gaps_over_1s": sum(gap > 1 for gap in gaps),
+        "timestamp_regressions": order_regressions,
     })
 
 (root / "capture-quality.json").write_text(json.dumps(report, indent=2) + "\n")
@@ -86,3 +89,9 @@ if exported.returncode != 0 or not videos:
 # touch animations must be audited before declaring this recording usable.
 if all(item["frames"] < 30 for item in report["recordings"]):
     raise SystemExit("Xcode recording does not contain enough actual frames")
+
+# A test can pass while screen capture is unusably sparse. Never report this
+# CI as proof of optical motion when it has major gaps or broken timestamps.
+if any(item["max_frame_gap_seconds"] is None or item["max_frame_gap_seconds"] > 0.5
+       or item["timestamp_regressions"] > 0 for item in report["recordings"]):
+    raise SystemExit("UNUSABLE_SCREEN_CAPTURE: frame gaps or timestamp regressions; use a physical iPhone screen recording for optical review")

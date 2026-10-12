@@ -3,3 +3,4 @@ Retry after fixing same-step SIMULATOR_UDID shell assignment.
 Retry: scenario count from allCases; VFR recorder starts before XCTest.
 Run after MORPH persistent glass and failed-XCTest frame diagnostics changes.
 Retry stable input surface; collect results for all four variants.
+Capture after passing FAST BUILD 38215399280; verify four gesture results and original VFR.

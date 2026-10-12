@@ -190,8 +190,8 @@ struct TDIExperimentScreen: View {
 
 // H2 — Native glass geometry transition, NOT a capsule scaled up.
 // The 274x80 core never changes. During touch-down, two native glass
-// satellite surfaces are inserted next to its ends, where the shared
-// GlassEffectContainer can morph/merge their geometry into the core.
+// satellite surfaces become visible next to its ends, where the shared
+// GlassEffectContainer may blend their geometry with the core.
 // Matched-geometry changes are restricted to GLASS (text remains still).
 private struct TDIMorphStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -212,23 +212,30 @@ private struct TDIMorphStyle: ButtonStyle {
                         .glassEffect(.regular.interactive(), in: .capsule)
                         .glassEffectID("core", in: glassNamespace)
 
-                    if configuration.isPressed {
-                        Color.clear
-                            .frame(width: 66, height: 66)
-                            .glassEffect(.regular, in: .circle)
-                            .glassEffectID("west", in: glassNamespace)
-                            .glassEffectTransition(.matchedGeometry)
-                            .offset(x: -126)
-                            .allowsHitTesting(false)
+                    // Keep both satellite views mounted for the entire gesture.
+                    // A press must never insert/remove hit-test relevant views:
+                    // previous conditional insertion cancelled the Button action.
+                    Color.clear
+                        .frame(width: 66, height: 66)
+                        .glassEffect(
+                            configuration.isPressed && !reduceMotion ? .regular : .identity,
+                            in: .circle
+                        )
+                        .glassEffectID("west", in: glassNamespace)
+                        .glassEffectTransition(.matchedGeometry)
+                        .offset(x: -126)
+                        .allowsHitTesting(false)
 
-                        Color.clear
-                            .frame(width: 66, height: 66)
-                            .glassEffect(.regular, in: .circle)
-                            .glassEffectID("east", in: glassNamespace)
-                            .glassEffectTransition(.matchedGeometry)
-                            .offset(x: 126)
-                            .allowsHitTesting(false)
-                    }
+                    Color.clear
+                        .frame(width: 66, height: 66)
+                        .glassEffect(
+                            configuration.isPressed && !reduceMotion ? .regular : .identity,
+                            in: .circle
+                        )
+                        .glassEffectID("east", in: glassNamespace)
+                        .glassEffectTransition(.matchedGeometry)
+                        .offset(x: 126)
+                        .allowsHitTesting(false)
                 }
                 .frame(width: 322, height: 126)
             }

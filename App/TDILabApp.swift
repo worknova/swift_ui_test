@@ -80,6 +80,9 @@ private struct TDIOpticalReference: View {
 struct TDIExperimentScreen: View {
     @State private var mode: TDIMode = .system
     @State private var releases: Int = 0
+    @State private var isPressed: Bool = false
+    @State private var pressBegins: Int = 0
+    @State private var pressEnds: Int = 0
     private let backdrop = Color(red: 0.035, green: 0.045, blue: 0.065)
     private let panel = Color(red: 0.07, green: 0.12, blue: 0.18)
 
@@ -123,10 +126,18 @@ struct TDIExperimentScreen: View {
                     .foregroundStyle(.white.opacity(0.69))
                     .accessibilityIdentifier("tdiReleaseCounter")
 
+                Text("PRESS \(pressBegins)/\(pressEnds)")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.56))
+                    .accessibilityIdentifier("tdiPressTelemetry")
+
                 Button("Next hypothesis") {
                     guard let next = TDIMode(rawValue: mode.rawValue + 1) else { return }
                     mode = next
                     releases = 0
+                    isPressed = false
+                    pressBegins = 0
+                    pressEnds = 0
                 }
                 .buttonStyle(.bordered)
                 .disabled(mode == .opticalLip)
@@ -152,91 +163,115 @@ struct TDIExperimentScreen: View {
 
     private func onRelease() { releases += 1 }
 
+    private func notePress(_ pressed: Bool) {
+        guard isPressed != pressed else { return }
+        isPressed = pressed
+        if pressed { pressBegins += 1 } else { pressEnds += 1 }
+    }
+
     @ViewBuilder
     private var experimentalButton: some View {
         switch mode {
         case .system:
             Button(action: onRelease) { startLabel }
                 .buttonStyle(.plain)
-                // H1: native response, zero custom geometry or press animation.
                 .glassEffect(.regular.interactive(), in: .capsule)
                 .accessibilityLabel("START")
                 .accessibilityIdentifier(mode.buttonIdentifier)
                 .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
 
-        case .morph:
-            Button(action: onRelease) { startLabel }
-                .buttonStyle(TDIMorphStyle())
-                .accessibilityLabel("START")
-                .accessibilityIdentifier(mode.buttonIdentifier)
-                .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
+        case .morph, .membrane, .opticalLip:
+            // Physical input has one invariant 274x80 label. Neither glass
+            // deformation nor glass material can reparent or resize this Button.
+            ZStack {
+                TDIExperimentalGlass(mode: mode, isPressed: isPressed)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
 
-        case .membrane:
-            Button(action: onRelease) { startLabel }
-                .buttonStyle(TDIMembraneStyle())
-                .accessibilityLabel("START")
-                .accessibilityIdentifier(mode.buttonIdentifier)
-                .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
-
-        case .opticalLip:
-            Button(action: onRelease) { startLabel }
-                .buttonStyle(TDIOpticalLipStyle())
-                .accessibilityLabel("START")
-                .accessibilityIdentifier(mode.buttonIdentifier)
-                .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
+                Button(action: onRelease) { startLabel }
+                    .buttonStyle(TDITrackPressStyle(onPressChange: notePress))
+                    .accessibilityLabel("START")
+                    .accessibilityIdentifier(mode.buttonIdentifier)
+                    .accessibilityValue("\(mode.code)|NEUTRAL|GLASS")
+            }
+            .frame(width: 330, height: 130)
         }
     }
 }
 
-// H2 — Peripheral native-glass merging, with stable button hit testing.
-// Touch input belongs only to configuration.label, at 274x80 pt.
-// The GlassEffectContainer lives entirely in the non-hit-testing background.
-// Morph material may change on press without replacing or resizing the Button.
-private struct TDIMorphStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+// The real Button never depends on the changing optical shape.
+// Observe native ButtonStyle.isPressed after SwiftUI updates its state.
+private struct TDITrackPressStyle: ButtonStyle {
+    let onPressChange: (Bool) -> Void
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .frame(width: 274, height: 80)
             .contentShape(Capsule())
-            .background {
-                GlassEffectContainer(spacing: 22) {
-                    ZStack {
-                        Color.clear
-                            .frame(width: 274, height: 80)
-                            .glassEffect(.regular, in: .capsule)
-
-                        Color.clear
-                            .frame(width: 66, height: 66)
-                            .glassEffect(
-                                configuration.isPressed && !reduceMotion ? .regular : .identity,
-                                in: .circle
-                            )
-                            .offset(x: -126)
-
-                        Color.clear
-                            .frame(width: 66, height: 66)
-                            .glassEffect(
-                                configuration.isPressed && !reduceMotion ? .regular : .identity,
-                                in: .circle
-                            )
-                            .offset(x: 126)
-                    }
-                    .frame(width: 322, height: 126)
-                }
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+            .onChange(of: configuration.isPressed) { _, pressed in
+                onPressChange(pressed)
             }
-            .animation(
-                reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.78),
-                value: configuration.isPressed
-            )
     }
 }
 
-// H3 — One interactive glass surface with a custom animatable Shape.
-// No overlaid glass, fake border, or scaled center. Only the lateral
-// contours deform; the top/bottom center and START stay stationary.
+private struct TDIExperimentalGlass: View {
+    let mode: TDIMode
+    let isPressed: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var active: Bool { isPressed && !reduceMotion }
+
+    @ViewBuilder
+    var body: some View {
+        switch mode {
+        case .system:
+            Color.clear
+        case .morph:
+            GlassEffectContainer(spacing: 22) {
+                ZStack {
+                    Color.clear
+                        .frame(width: 274, height: 80)
+                        .glassEffect(.regular, in: .capsule)
+                    Color.clear
+                        .frame(width: 66, height: 66)
+                        .glassEffect(active ? .regular : .identity, in: .circle)
+                        .offset(x: -126)
+                    Color.clear
+                        .frame(width: 66, height: 66)
+                        .glassEffect(active ? .regular : .identity, in: .circle)
+                        .offset(x: 126)
+                }
+                .frame(width: 322, height: 126)
+            }
+            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: active)
+        case .membrane:
+            Color.clear
+                .frame(width: 322, height: 126)
+                .glassEffect(
+                    .regular,
+                    in: TDIElasticOutline(deformation: active ? 1 : 0)
+                )
+                .animation(.spring(response: 0.24, dampingFraction: 0.69), value: active)
+        case .opticalLip:
+            ZStack {
+                Color.clear
+                    .frame(width: 330, height: 130)
+                    .glassEffect(
+                        .regular,
+                        in: TDIContinuousGlassLip(emergence: active ? 1 : 0)
+                    )
+                    .opacity(active ? 1 : 0)
+                Color.clear
+                    .frame(width: 274, height: 80)
+                    .glassEffect(.regular, in: .capsule)
+            }
+            .frame(width: 330, height: 130)
+            .animation(.spring(response: 0.19, dampingFraction: 0.77), value: active)
+        }
+    }
+}
+
+// Native material geometry only. Neither Shape participates in hit testing.
 @Animatable
 private struct TDIElasticOutline: Shape {
     var deformation: CGFloat
@@ -279,43 +314,6 @@ private struct TDIElasticOutline: Shape {
     }
 }
 
-// The animated material is a background, not the touch surface.
-// This isolates physical button input from the custom changing Shape.
-private struct TDIMembraneStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .frame(width: 274, height: 80)
-            .contentShape(Capsule())
-            .background {
-                Color.clear
-                    .frame(width: 322, height: 126)
-                    .glassEffect(
-                        .regular,
-                        in: TDIElasticOutline(
-                            deformation: (!reduceMotion && configuration.isPressed) ? 1 : 0
-                        )
-                    )
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-            .animation(
-                reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.69),
-                value: configuration.isPressed
-            )
-    }
-}
-
-// H4 — PERIPHERAL LENS / OPTICAL LIP.
-// A continuous, real GLASS annulus encircles a dimensionally fixed core.
-// During touch-down the outside edge grows in all directions, while the
-// inside edge, glass core and typography remain stationary.
-//
-// The annular Shape uses *opposite winding* for inner/outer subpaths,
-// i.e. it describes a real hole without post-material .mask / .opacity
-// tricks that can flatten the glass lens. Whether the native material
-// honors the expected inner refraction must be verified on the iPhone.
 @Animatable
 private struct TDIContinuousGlassLip: Shape {
     var emergence: CGFloat
@@ -349,37 +347,3 @@ private struct TDIContinuousGlassLip: Shape {
     }
 }
 
-private struct TDIOpticalLipStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .frame(width: 274, height: 80)
-            .contentShape(Capsule())
-            .background {
-                ZStack {
-                    // Annular native glass is optical-only; it never takes touch input.
-                    Color.clear
-                        .frame(width: 330, height: 130)
-                        .glassEffect(
-                            .regular,
-                            in: TDIContinuousGlassLip(
-                                emergence: (!reduceMotion && configuration.isPressed) ? 1 : 0
-                            )
-                        )
-                        .opacity(configuration.isPressed && !reduceMotion ? 1 : 0)
-
-                    Color.clear
-                        .frame(width: 274, height: 80)
-                        .glassEffect(.regular, in: .capsule)
-                }
-                .frame(width: 330, height: 130)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-            }
-            .animation(
-                reduceMotion ? nil : .spring(response: 0.19, dampingFraction: 0.77),
-                value: configuration.isPressed
-            )
-    }
-}

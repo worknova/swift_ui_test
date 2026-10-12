@@ -1,7 +1,9 @@
 import XCTest
 
 final class TDIInteractionUITests: XCTestCase {
-    override func setUpWithError() throws { continueAfterFailure = false }
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
 
     func testFourDistinctPhysicalHolds() throws {
         let app = XCUIApplication()
@@ -10,28 +12,59 @@ final class TDIInteractionUITests: XCTestCase {
         let signature = app.staticTexts["tdiVariantSignature"]
         let releases = app.staticTexts["tdiReleaseCounter"]
         let next = app.buttons["tdiNextHypothesis"]
-        XCTAssertTrue(signature.waitForExistence(timeout: 25))
+        XCTAssertTrue(signature.waitForExistence(timeout: 25), "Scenario signature not found")
+
+        let scenarios = ["SYSTEM", "MORPH", "MEMBRANE", "OPTICAL_LIP"]
         var failures: [String] = []
-        for (index, code) in ["SYSTEM", "MORPH", "MEMBRANE", "OPTICAL_LIP"].enumerated() {
-            let expected = "\(index + 1)/4|\(code)|NEUTRAL|HOLD-1.2"
-            XCTAssertEqual(signature.label, expected)
-            let button = app.buttons["tdi\(code)Button"]
-            XCTAssertTrue(button.waitForExistence(timeout: 8))
-            XCTAssertEqual(button.label, "START")
-            XCTAssertEqual(button.value as? String, "\(code)|NEUTRAL|GLASS")
-            XCTAssertEqual(releases.label, "RELEASES 0")
-            // Inspect a stable pre-touch scene before the real interaction.
-            Thread.sleep(forTimeInterval: 1.0)
-            button.press(forDuration: 1.2)
-            let observedRelease = releases.label
-            if observedRelease != "RELEASES 1" {
-                XCTContext.runActivity(named: "\(code) gesture failure: \(observedRelease)") { _ in }
-                failures.append("\(code): \(observedRelease)")
+
+        for (index, code) in scenarios.enumerated() {
+            let expectedSignature = "\(index + 1)/\(scenarios.count)|\(code)|NEUTRAL|HOLD-1.2"
+            if signature.label != expectedSignature {
+                failures.append("\(code): signature \(signature.label) != \(expectedSignature)")
             }
-            Thread.sleep(forTimeInterval: 0.9)
-            if index < 3 { next.tap() }
+
+            let button = app.buttons["tdi\(code)Button"]
+            if button.waitForExistence(timeout: 8) {
+                if button.label != "START" {
+                    failures.append("\(code): label \(button.label)")
+                }
+                if (button.value as? String) != "\(code)|NEUTRAL|GLASS" {
+                    failures.append("\(code): unexpected accessibility value")
+                }
+                if releases.label != "RELEASES 0" {
+                    failures.append("\(code): counter was \(releases.label) before touch")
+                }
+
+                Thread.sleep(forTimeInterval: 0.8)
+                print("TDI_STAGE \(code) HOLD_BEGIN unix=\(Date().timeIntervalSince1970)")
+                button.press(forDuration: 1.2)
+                print("TDI_STAGE \(code) HOLD_END unix=\(Date().timeIntervalSince1970)")
+
+                let counterUpdated = XCTNSPredicateExpectation(
+                    predicate: NSPredicate(format: "label == %@", "RELEASES 1"),
+                    object: releases
+                )
+                let updateResult = XCTWaiter.wait(for: [counterUpdated], timeout: 2.0)
+                if updateResult != .completed {
+                    failures.append("\(code): expected RELEASES 1, got \(releases.label)")
+                    XCTContext.runActivity(named: "\(code) action missing") { _ in }
+                }
+                Thread.sleep(forTimeInterval: 0.8)
+            } else {
+                failures.append("\(code): START button not found")
+            }
+
+            if index < scenarios.count - 1 {
+                if next.waitForExistence(timeout: 5) && next.isEnabled {
+                    next.tap()
+                } else {
+                    failures.append("\(code): cannot advance to next scenario")
+                    break
+                }
+            }
         }
-        XCTAssertEqual(signature.label, "4/4|OPTICAL_LIP|NEUTRAL|HOLD-1.2")
-        XCTAssertTrue(failures.isEmpty, "Gesture failures: \(failures.joined(separator: \", \"))")
+
+        let report = failures.joined(separator: "; ")
+        XCTAssertTrue(failures.isEmpty, "TDI gesture failures: \(report)")
     }
 }

@@ -37,7 +37,7 @@ xcodebuild build-for-testing -project TDILab.xcodeproj -scheme TDILab \
 CI is **opt-in**, and the two workflows are independent. Neither starts on ordinary source commits.
 
 - **FAST BUILD** — [`.github/workflows/tdi-fast-build.yml`](.github/workflows/tdi-fast-build.yml). Invoke via `workflow_dispatch`, or by updating `.github/tdi-build.request` on this branch. Compiles the native app **and XCTest bundle** with a generic iOS Simulator destination. Does **not** boot a device, run tests, or record video. Uploads build diagnostics and stage timings.
-- **CAPTURE** — [`.github/workflows/tdi-glass-capture.yml`](.github/workflows/tdi-glass-capture.yml). Invoke via `workflow_dispatch`, or by updating `.github/tdi-capture.request`. Runs Swift/Python syntax preflight, compiles first, then boots one iPhone simulator and waits for readiness and runs four physical XCTest holds. Uses Xcode's own UI test screen recording retained for successful tests and exported from `.xcresult` with `xcresulttool`. Reports decoded frame timestamps and gap statistics in `capture-quality.json`. The legacy `simctl recordVideo` output is intentionally not used: its previous artifacts had 42-second frame gaps. Video quality still requires validation during actual touch intervals.
+- **CAPTURE** — [`.github/workflows/tdi-glass-capture.yml`](.github/workflows/tdi-glass-capture.yml). Invoke via `workflow_dispatch`, or by updating `.github/tdi-capture.request`. Runs Swift/Python syntax preflight, compiles first, then boots one iPhone simulator and waits for readiness and runs four physical XCTest holds. Uses Xcode's own UI test screen recording retained for successful tests and exported from `.xcresult` with `xcresulttool`. Reports decoded frame timestamps and gap statistics in `capture-quality.json`. The legacy `simctl recordVideo` output is intentionally not used: its previous artifacts had 42-second frame gaps. CI now rejects recordings with >500 ms gaps or timestamps that run backwards; a passing XCTest alone is insufficient. This is a strict quality gate rather than a guarantee of smooth animation.
 
 Run FAST first after source changes; run CAPTURE only after FAST succeeds, when native interaction/optics need evaluation. They intentionally use *separate fresh GitHub runners* so passing FAST does not transfer any compiled cache to CAPTURE. Do not chain them as two sequential jobs in one full capture: this would add cold-runner overhead.
 
@@ -50,3 +50,9 @@ Passing XCTest is not proof of a usable recording. If Xcode's recording still ha
 3. Clear difference in response between the four mechanisms.
 4. No unexpected double surfaces or seams.
 5. Repeatable real holds and clean return to idle.
+
+## Reliable optical capture: real device
+
+GitHub-hosted iOS Simulator capture is **not suitable for motion-fidelity review** in this experiment. Both `simctl recordVideo` and Xcode's own `.xcresult` video produced dropped frame intervals greater than one second. Continue using GA for build and interaction assertions, not visual animation acceptance.
+
+Run TDILab on a **physical iPhone** and record directly using Control Center > Screen Recording, or connect the iPhone to a Mac with USB and use QuickTime Player > File > New Movie Recording > Camera: iPhone > Record. Transfer the original video unmodified. Inspect decoded frame timestamps and original frames around each 1.2-second hold; do not use synthetic 60 FPS interpolation to mask lost frames. No physical-device capture has yet been tested in this repository.

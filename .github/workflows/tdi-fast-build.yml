@@ -16,6 +16,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Static Swift and Python preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc -frontend -parse App/TDILabApp.swift Tests/TDIInteractionUITests.swift
+          python3 -m py_compile scripts/record_tdi.py
+          echo "Preflight successful"
       - name: Measure FAST build
         shell: bash
         run: |
